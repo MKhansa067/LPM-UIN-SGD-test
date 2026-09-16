@@ -1,0 +1,94 @@
+==============================================================================
+REVISI UI #1 — BERANDA LPM UIN SGD (Iterasi 9)
+==============================================================================
+Tanggal    : 2026-09-14
+Versi      : v0.9.0 (UI overhaul Beranda)
+Tipe       : ui | refactor
+Developer  : AI Agent (Cline)
+
+------------------------------------------------------------------------------
+1. TUJUAN
+------------------------------------------------------------------------------
+Merombak halaman Beranda mengikuti referensi: logo UIN+BLU+Akreditasi di kiri
+atas, banner utama `logo-lpm.webp` di tengah hero, dan bagian Berita yang
+menampilkan FOTO DOKUMENTASI berita (unggahan dashboard admin) saat digulir —
+bukan hanya judul & deskripsi saja.
+
+------------------------------------------------------------------------------
+2. PERUBAHAN UTAMA
+------------------------------------------------------------------------------
+a) HEADER (components/public/Header.tsx)
+   - Logo kiri-atas diganti menjadi `public/assets/logo-uin-blu-akre.webp`
+     (gabungan logo UIN SGD + BLU + Akreditasi Unggul, wide/landscape).
+   - Teks institusi "Lembaga Penjaminan Mutu - UIN Sunan Gunung Djati Bandung"
+     tetap di samping logo.
+   - Badge Akreditasi Unggul + ISO 9001:2015 di sisi kanan tetap dipertahankan.
+
+b) TOP BAR (components/public/TopHeader.tsx)
+   - Ditambah field SEARCH dokumen (form GET ke /dokumen?q=...).
+   - Ikon sosial media diganti brand icon asli (Facebook, Instagram, YouTube,
+     X/Twitter) karena lucide-react v1.x TIDAK menyediakan brand icons lagi.
+   - Portal Admin & switch bahasa tetap ada.
+
+c) HERO/BANNER (components/public/Hero.tsx)
+   - Didominasi `public/assets/logo-lpm.webp` sebagai BANNER UTAMA di tengah
+     hero (banner lengkap LPM: logo kampus, teks Lembaga Penjaminan Mutu,
+     gedung, dan deretan logo akreditasi nasional/internasional).
+   - Panel "Live Data Hub" + teks headline lama DIHAPUS karena banner sudah
+     memuat seluruh pesan tersebut.
+
+d) BERITA & PENGUMUMAN (components/public/HomeFeeds.tsx) — ROMBAK TOTAL
+   - Data di-fetch real-time dari GET /api/feeds (database PostgreSQL).
+   - Berita (kiri, 2 kolom kartu): SETIAP kartu menampilkan FOTO DOKUMENTASI
+     (`imageUrl` dari tabel lpm_feeds — foto yang diunggah lewat Dashboard
+     Admin CMS) + badge kategori + tanggal + judul + ringkasan + tombol
+     "Selengkapnya". Foto punya fallback otomatis ke logo LPM bila kosong.
+   - Pengumuman (kanan, 1 kolom): daftar tanggal + judul + tombol "Lainnya".
+   - Loading skeleton saat fetch, lalu di-replace data API.
+   - Data cadangan (fallback) bila API/DB tidak aktif.
+
+e) FOOTER (components/public/Footer.tsx)
+   - Logo diganti `logo-uin-blu-akre.webp` + `logo-lpm.webp`.
+   - Ditambah baris ikon sosial media berwarna brand.
+   - Kontak, alamat, dan tautan resmi tetap dipertahankan.
+
+------------------------------------------------------------------------------
+3. FILE YANG DIUBAH / DITAMBAH
+------------------------------------------------------------------------------
+| File                                     | Keterangan                     |
+|------------------------------------------|--------------------------------|
+| components/public/Header.tsx             | Logo kiri-atas diganti         |
+| components/public/TopHeader.tsx          | + search & sosial media        |
+| components/public/Hero.tsx               | Banner utama logo-lpm.webp     |
+| components/public/HomeFeeds.tsx          | Romak total (foto berita API)  |
+| components/public/Footer.tsx             | Logo + sosial media row        |
+| components/public/SocialIcons.tsx        | BARU: brand icon SVG inline    |
+| app/page.tsx                             | Urutan section dirombak        |
+| docs/revisi-ui-1.txt                     | Dokumen revisi ini (BARU)      |
+
+CATATAN: `logo-lpm.webp` TIDAK dihapus dari header/footer secara total —
+tetap dipakai di footer; di beranda sekarang menjadi gambar banner utama.
+
+------------------------------------------------------------------------------
+4. CATATAN PENTING
+------------------------------------------------------------------------------
+- Foto dokumentasi berita berasal dari kolom `image_url` tabel `lpm_feeds`.
+  Admin dapat mengunggah foto lewat Dashboard > CMS > form feed
+  (produk dari /api/uploads yang menyimpan ke public/uploads).
+- Jika `public/uploads` masih kosong, kartu berita menampilkan fallback logo.
+- lucide-react v1.x menghapus brand icons → ikon FB/IG/YT/X dibuat manual
+  di SocialIcons.tsx (inline SVG warna brand).
+
+------------------------------------------------------------------------------
+5. TEST PLAN (sudah/silahkan diverifikasi)
+------------------------------------------------------------------------------
+1. npm run dev → buka http://localhost:3000
+2. Header: logo UIN+BLU+Akreditasi tampil di kiri atas.
+3. Hero: banner logo-lpm.webp besar di tengah, responsive (mobile/laptop).
+4. Scroll ke bagian Berita:
+   a. Kartu berita menampilkan FOTO dokumentasi + judul + tanggal + deskripsi
+   b. Sidebar pengumuman tampil di kanan dengan tombol Lainnya
+   c. Foto berubah sesuai data yang diunggah admin (cek /api/feeds)
+5. Footer: terdapat logo + sosial media row.
+6. npm run build → pastikan build produksi sukses.
+==============================================================================

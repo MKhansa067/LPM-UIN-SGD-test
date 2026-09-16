@@ -38,4 +38,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# user uploads (created at runtime)
+/public/uploads/
 next-env.d.ts

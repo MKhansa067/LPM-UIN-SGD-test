@@ -1,0 +1,41 @@
+services:
+  lpm-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: lpm_app_dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://lpm_user:lpm_password@lpm-postgres:5432/lpm_db
+      - NEXTAUTH_SECRET=dev-secret-key-32-characters-minimum-lpm-uin-sgd
+      - NEXTAUTH_URL=http://localhost:3000
+    depends_on:
+      lpm-postgres:
+        condition: service_healthy
+
+  lpm-postgres:
+    image: postgres:16-alpine
+    container_name: lpm_postgres_dev
+    environment:
+      POSTGRES_DB: lpm_db
+      POSTGRES_USER: lpm_user
+      POSTGRES_PASSWORD: lpm_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - lpm_pgdata_dev:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lpm_user -d lpm_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  lpm_pgdata_dev:

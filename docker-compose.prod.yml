@@ -1,0 +1,49 @@
+services:
+  lpm-nginx:
+    image: nginx:alpine
+    container_name: lpm_nginx_prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - lpm_certs:/etc/nginx/certs:ro
+    depends_on:
+      - lpm-app
+
+  lpm-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lpm_app_prod
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+    depends_on:
+      lpm-postgres:
+        condition: service_healthy
+
+  lpm-postgres:
+    image: postgres:16-alpine
+    container_name: lpm_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lpm_db}
+      POSTGRES_USER: ${POSTGRES_USER:-lpm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - lpm_pgdata_prod:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lpm_user} -d ${POSTGRES_DB:-lpm_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  lpm_pgdata_prod:
+  lpm_certs:
