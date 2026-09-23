@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lpmAuditLogs } from "@/lib/schema";
+import { lpmAuditLogs, lpmAdmins } from "@/lib/schema";
 import { desc, eq } from "drizzle-orm";
 
 interface AuditLogItem {
@@ -13,38 +13,6 @@ interface AuditLogItem {
   ipAddress: string;
   createdAt: string;
 }
-
-const sampleAuditLogs: AuditLogItem[] = [
-  {
-    id: 1,
-    adminName: "Super Admin LPM",
-    action: "LOGIN",
-    targetTable: "lpm_admins",
-    details: { message: "Berhasil login dari sesi terenkripsi JWT" },
-    ipAddress: "127.0.0.1",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    adminName: "Super Admin LPM",
-    action: "UPDATE",
-    targetTable: "lpm_accreditation",
-    targetId: 1,
-    details: { message: "Mengubah data akreditasi Teknik Informatika menjadi Unggul" },
-    ipAddress: "127.0.0.1",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    adminName: "Super Admin LPM",
-    action: "CREATE",
-    targetTable: "lpm_feeds",
-    targetId: 5,
-    details: { message: "Mempublikasikan Berita AMI Semester Genap 2025/2026" },
-    ipAddress: "127.0.0.1",
-    createdAt: new Date().toISOString(),
-  },
-];
 
 function stringifyDetails(details: unknown): string {
   if (!details) return "-";
@@ -64,27 +32,43 @@ export async function GET(request: Request) {
     const action = searchParams.get("action");
     const query = searchParams.get("q");
 
-    let logs: AuditLogItem[] = [...sampleAuditLogs];
+    let logs: AuditLogItem[] = [];
 
     try {
-      const dbLogs = await db.select().from(lpmAuditLogs).orderBy(desc(lpmAuditLogs.createdAt));
+      const dbLogs = await db
+        .select({
+          id: lpmAuditLogs.id,
+          action: lpmAuditLogs.action,
+          targetTable: lpmAuditLogs.targetTable,
+          targetId: lpmAuditLogs.targetId,
+          details: lpmAuditLogs.details,
+          ipAddress: lpmAuditLogs.ipAddress,
+          createdAt: lpmAuditLogs.createdAt,
+          adminId: lpmAuditLogs.adminId,
+          adminName: lpmAdmins.name,
+          adminUsername: lpmAdmins.username,
+        })
+        .from(lpmAuditLogs)
+        .leftJoin(lpmAdmins, eq(lpmAuditLogs.adminId, lpmAdmins.id))
+        .orderBy(desc(lpmAuditLogs.createdAt));
+
       if (dbLogs && dbLogs.length > 0) {
         logs = dbLogs.map((l) => ({
           id: l.id,
-          adminName: l.adminId ? `Admin #${l.adminId}` : "System",
+          adminName: l.adminName || l.adminUsername || (l.adminId ? `Admin #${l.adminId}` : "System Superadmin"),
           action: l.action,
           targetTable: l.targetTable || "-",
           targetId: l.targetId || undefined,
           details: l.details,
-          ipAddress: l.ipAddress || "-",
+          ipAddress: l.ipAddress || "127.0.0.1",
           createdAt: l.createdAt ? l.createdAt.toISOString() : new Date().toISOString(),
         }));
       }
-    } catch {
-      // Offline fallback
+    } catch (err) {
+      console.error("Error fetching audit logs:", err);
     }
 
-    if (action) {
+    if (action && action !== "Semua") {
       logs = logs.filter((l) => l.action.toLowerCase() === action.toLowerCase());
     }
 

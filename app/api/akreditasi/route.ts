@@ -2,48 +2,21 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lpmAccreditation } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+import { recordAuditLog } from "@/lib/audit";
 
-const sampleAccreditations = [
-  {
-    id: 1,
-    studyProgram: "Teknik Informatika",
-    faculty: "Fakultas Sains dan Teknologi",
-    degree: "S1",
-    status: "Unggul",
-    accreditationBody: "LAM INFOKOM",
-    skNumber: "SK-042/LAM-INFOKOM/2025",
-    validUntil: "2030-05-15",
-    quarter: "Q1-2026",
-    semester: "Genap 2025/2026",
-    internationalAccredited: true,
-  },
-  {
-    id: 2,
-    studyProgram: "Sistem Informasi",
-    faculty: "Fakultas Sains dan Teknologi",
-    degree: "S1",
-    status: "Unggul",
-    accreditationBody: "LAM INFOKOM",
-    skNumber: "SK-112/LAM-INFOKOM/2024",
-    validUntil: "2029-08-20",
-    quarter: "Q1-2026",
-    semester: "Genap 2025/2026",
-    internationalAccredited: false,
-  },
-  {
-    id: 3,
-    studyProgram: "Pendidikan Agama Islam",
-    faculty: "Fakultas Tarbiyah dan Keguruan",
-    degree: "S1",
-    status: "Unggul",
-    accreditationBody: "LAMDIK",
-    skNumber: "SK-089/LAMDIK/2024",
-    validUntil: "2029-11-10",
-    quarter: "Q1-2026",
-    semester: "Genap 2025/2026",
-    internationalAccredited: true,
-  },
-];
+interface AccItem {
+  id: number;
+  studyProgram: string;
+  faculty: string;
+  degree: string;
+  status: string;
+  accreditationBody: string;
+  skNumber: string;
+  validUntil: string;
+  quarter: string;
+  semester: string;
+  internationalAccredited: boolean;
+}
 
 export async function GET(request: Request) {
   try {
@@ -52,7 +25,7 @@ export async function GET(request: Request) {
     const degree = searchParams.get("degree");
     const status = searchParams.get("status");
 
-    let data = [...sampleAccreditations];
+    let data: AccItem[] = [];
 
     try {
       const dbAcc = await db.select().from(lpmAccreditation);
@@ -71,8 +44,8 @@ export async function GET(request: Request) {
           internationalAccredited: a.rating === "Internasional",
         }));
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.error("Error fetching accreditation from DB:", err);
     }
 
     if (faculty && faculty !== "Semua") {
@@ -116,7 +89,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const newItem = {
+    let newItem: AccItem = {
       id: Date.now(),
       studyProgram,
       faculty,
@@ -145,12 +118,23 @@ export async function POST(request: Request) {
           skUrl: skNumber || "SK-DEFAULT",
         })
         .returning();
+
       if (inserted && inserted.length > 0) {
         newItem.id = inserted[0].id;
       }
-    } catch {
-      sampleAccreditations.unshift(newItem);
+    } catch (err) {
+      console.error("Error inserting accreditation into DB:", err);
     }
+
+    // Record audit log permanently in DB
+    await recordAuditLog({
+      adminId: 1,
+      action: "CREATE",
+      targetTable: "lpm_accreditation",
+      targetId: newItem.id,
+      details: `Memperbarui/menambahkan data akreditasi prodi '${studyProgram}' (${status})`,
+      ipAddress: "127.0.0.1",
+    });
 
     return NextResponse.json({ success: true, data: newItem }, { status: 201 });
   } catch (error) {
@@ -167,11 +151,18 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "ID wajib diisi" }, { status: 400 });
     }
 
-    try {
-      await db.delete(lpmAccreditation).where(eq(lpmAccreditation.id, parseInt(id, 10)));
-    } catch {
-      // Fallback
-    }
+    const accId = parseInt(id, 10);
+    await db.delete(lpmAccreditation).where(eq(lpmAccreditation.id, accId));
+
+    // Record audit log permanently in DB
+    await recordAuditLog({
+      adminId: 1,
+      action: "DELETE",
+      targetTable: "lpm_accreditation",
+      targetId: accId,
+      details: `Menghapus data akreditasi ID ${accId}`,
+      ipAddress: "127.0.0.1",
+    });
 
     return NextResponse.json({ success: true, message: "Data akreditasi berhasil dihapus" });
   } catch (error) {

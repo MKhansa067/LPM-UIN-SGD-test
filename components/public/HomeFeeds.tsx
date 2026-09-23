@@ -53,70 +53,7 @@ function toPlainText(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/* ================= Data Cadangan (jika API/DB mati) ================= */
-
-const fallbackFeeds: FeedItem[] = [
-  {
-    id: 1,
-    title: "Pelaksanaan Audit Mutu Internal (AMI) Semester Genap TA 2025/2026 UIN SGD Bandung",
-    category: "Berita",
-    publishedDate: "2026-03-08",
-    content:
-      "Lembaga Penjaminan Mutu (LPM) UIN Sunan Gunung Djati Bandung secara resmi membuka rangkaian pelaksanaan Audit Mutu Internal (AMI) untuk Semester Genap Tahun Akademik 2025/2026.",
-    imageUrl: "/assets/logo-lpm.webp",
-    viewCount: 1420,
-  },
-  {
-    id: 2,
-    title: "Sosialisasi Penyusunan Borang Akreditasi Internasional ASIIN bagi Program Studi S1",
-    category: "Berita",
-    publishedDate: "2026-03-05",
-    content:
-      "Dalam upaya memperkuat posisi UIN Sunan Gunung Djati Bandung sebagai World Class University, LPM menggelar pendampingan intensif penyusunan dokumen Self Assessment Report (SAR).",
-    imageUrl: "/assets/logo-uinsgd.webp",
-    viewCount: 980,
-  },
-  {
-    id: 3,
-    title: "Sosialisasi & Workshop Penyusunan Borang Akreditasi Unggul Program Studi",
-    category: "Berita",
-    publishedDate: "2026-02-24",
-    content:
-      "LPM mengundang seluruh Gugus Kendali Mutu (GKM) fakultas untuk mengikuti workshop penyusunan borang akreditasi unggul BAN-PT terbaru.",
-    imageUrl: "/assets/logo-akreditasi.webp",
-    viewCount: 1240,
-  },
-  {
-    id: 4,
-    title: "Pengumuman Jadwal Desk Evaluation Audit Mutu Internal Fakultas Tarbiyah dan Keguruan",
-    category: "Pengumuman",
-    publishedDate: "2026-03-09",
-    content:
-      "Diberitahukan kepada seluruh Tim Gugus Kendali Mutu (GKM) FTK bahwa unggah dokumen borang SPMI dibuka hingga 15 Maret 2026.",
-    imageUrl: "/assets/logo-lpm.webp",
-    viewCount: 2310,
-  },
-  {
-    id: 5,
-    title: "Undangan Rapat Tinjauan Manajemen (RTM) Hasil Survei Kepuasan Civitas Akademika 2025",
-    category: "Pengumuman",
-    publishedDate: "2026-03-02",
-    content:
-      "Rapat Tinjauan Manajemen (RTM) Penjaminan Mutu akan diselenggarakan pada Selasa, 17 Maret 2026 di Aula Rektorat Lantai 3.",
-    imageUrl: "/assets/logo-uinsgd.webp",
-    viewCount: 1850,
-  },
-  {
-    id: 6,
-    title: "Pengumuman Tindak Lanjut Hasil Audit Mutu Internal Tahun 2025",
-    category: "Pengumuman",
-    publishedDate: "2026-02-28",
-    content:
-      "Seluruh unit wajib mengunggah bukti tindak lanjut temuan AMI melalui sistem SPMI paling lambat akhir Maret 2026.",
-    imageUrl: "/assets/logo-uin-blu-akre.webp",
-    viewCount: 1160,
-  },
-];
+/* ================= Data Cadangan (Dihapus — 100% Database Driven) ================= */
 
 /* ================= Sub Komponen ================= */
 
@@ -172,7 +109,7 @@ function SkeletonListItem() {
  * - Pengumuman (kanan): daftar pengumuman + tombol Lainnya.
  */
 export default function HomeFeeds() {
-  const [feeds, setFeeds] = useState<FeedItem[]>(fallbackFeeds);
+  const [feeds, setFeeds] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -181,13 +118,9 @@ export default function HomeFeeds() {
       .then((res) => res.json())
       .then((json) => {
         if (cancelled) return;
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setFeeds(json.data);
-        }
+        if (json.success && Array.isArray(json.data)) setFeeds(json.data);
       })
-      .catch(() => {
-        /* Biarkan data cadangan */
-      })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoading(false);
       });

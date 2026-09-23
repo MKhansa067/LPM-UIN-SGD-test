@@ -33,11 +33,20 @@ export default function AdminCmsFeedsPage() {
     try { const res = await fetch("/api/feeds?all=1"); const json = await res.json(); if (json.success && json.data) setFeeds(json.data); } catch { /* fallback */ }
   }
 
-  function openCreateModal() {
-    setEditId(null); setTitle(""); setCategory("Berita");
+  function resetForm() {
+    setEditId(null);
+    setTitle("");
+    setCategory("Berita");
     setPublishedDate(new Date().toISOString().split("T")[0]);
-    setContent(""); setImageUrl("/assets/logo-lpm.webp"); setPdfAttachmentUrl("-"); setSections([]);
+    setContent("");
+    setImageUrl("/assets/logo-lpm.webp");
+    setPdfAttachmentUrl("-");
+    setSections([]);
     setIsPublished(true);
+  }
+
+  function openCreateModal() {
+    resetForm();
     setShowModal(true);
   }
 
@@ -129,7 +138,9 @@ export default function AdminCmsFeedsPage() {
       const method = editId ? "PUT" : "POST";
       await fetch(url, { method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, category, publishedDate, content, imageUrl, pdfAttachmentUrl, sections, isPublished }) });
-      setShowModal(false); fetchFeeds();
+      setShowModal(false);
+      resetForm();
+      fetchFeeds();
     } catch { alert(editId ? "Gagal memperbarui feed" : "Gagal menyimpan feed"); }
   }
 
@@ -156,7 +167,7 @@ return (
           <span className="text-xs uppercase font-bold text-amber-500 tracking-wider block">Kelola Media & Informasi</span>
           <h1 className="text-xl font-bold text-slate-900">CMS Berita & Pengumuman LPM</h1>
         </div>
-        <button onClick={() => setShowModal(true)} className="inline-flex items-center space-x-2 bg-emerald-900 hover:bg-emerald-950 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors">
+        <button onClick={openCreateModal} className="inline-flex items-center space-x-2 bg-emerald-900 hover:bg-emerald-950 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors">
           <Plus className="w-4 h-4 text-amber-400" /><span>Tambah Feed Baru</span>
         </button>
       </div>

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lpmFeeds } from "@/lib/schema";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
+import { recordAuditLog } from "@/lib/audit";
 
 interface FeedItem {
   id: number;
@@ -17,57 +18,6 @@ interface FeedItem {
   createdAt: string;
 }
 
-const fallbackFeeds: FeedItem[] = [
-  {
-    id: 1,
-    title: "Pelaksanaan Audit Mutu Internal (AMI) Semester Genap TA 2025/2026 UIN Sunan Gunung Djati Bandung",
-    category: "Berita",
-    publishedDate: "2026-03-08",
-    content: "Lembaga Penjaminan Mutu (LPM) UIN Sunan Gunung Djati Bandung secara resmi membuka rangkaian pelaksanaan Audit Mutu Internal (AMI) untuk Semester Genap Tahun Akademik 2025/2026. Kegiatan ini diikuti oleh seluruh program studi dari 9 fakultas dan Program Pascasarjana.\n\nKetua LPM UIN SGD Bandung menyampaikan bahwa AMI periode ini berfokus pada kesiapan akreditasi internasional dan evaluasi capaian Indikator Kinerja Utama (IKU) universitas.",
-    imageUrl: "/assets/logo-lpm.webp",
-    pdfAttachmentUrl: "-",
-    viewCount: 1420,
-    sections: [],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    title: "Sosialisasi Penyusunan Borang Akreditasi Internasional ASIIN bagi Program Studi S1",
-    category: "Berita",
-    publishedDate: "2026-03-05",
-    content: "Dalam upaya memperkuat posisi UIN Sunan Gunung Djati Bandung sebagai World Class University, LPM menggelar pendampingan intensif penyusunan dokumen Self Assessment Report (SAR) untuk akreditasi internasional ASIIN.",
-    imageUrl: "/assets/logo-uinsgd.webp",
-    pdfAttachmentUrl: "-",
-    viewCount: 980,
-    sections: [],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    title: "Pengumuman Jadwal Desk Evaluation Audit Mutu Internal Fakultas Tarbiyah dan Keguruan",
-    category: "Pengumuman",
-    publishedDate: "2026-03-09",
-    content: "Diberitahukan kepada seluruh Tim Gugus Kendali Mutu (GKM) di lingkungan Fakultas Tarbiyah dan Keguruan UIN SGD Bandung bahwa unggah dokumen borang SPMI dibuka hingga 15 Maret 2026.",
-    imageUrl: "/assets/logo-lpm.webp",
-    pdfAttachmentUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    viewCount: 2310,
-    sections: [],
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 4,
-    title: "Undangan Rapat Tinjauan Manajemen (RTM) Hasil Survei Kepuasan Civitas Akademika 2025",
-    category: "Pengumuman",
-    publishedDate: "2026-03-02",
-    content: "Rapat Tinjauan Manajemen (RTM) Penjaminan Mutu akan diselenggarakan pada Hari Selasa, 17 Maret 2026 bertempat di Aula Rektorat Lantai 3 UIN Sunan Gunung Djati Bandung.",
-    imageUrl: "/assets/logo-uinsgd.webp",
-    pdfAttachmentUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    viewCount: 1850,
-    sections: [],
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -77,12 +27,12 @@ export async function GET(request: Request) {
     // `all=1` mengembalikan feeds draft + published (khusus halaman admin CMS).
     const includeUnpublished = searchParams.get("all") === "1";
 
-    let feeds = [...fallbackFeeds];
+    let feeds: FeedItem[] = [];
 
     try {
       const dbFeeds = await db.select().from(lpmFeeds).orderBy(desc(lpmFeeds.publishedDate));
       if (dbFeeds && dbFeeds.length > 0) {
-        feeds = dbFeeds.map(f => ({
+        feeds = dbFeeds.map((f) => ({
           ...f,
           imageUrl: f.imageUrl || "",
           pdfAttachmentUrl: f.pdfAttachmentUrl || "-",
@@ -92,8 +42,8 @@ export async function GET(request: Request) {
           isPublished: f.isPublished ?? true,
         }));
       }
-    } catch {
-      // Fall back to sample feeds if DB not running locally
+    } catch (err) {
+      console.error("Error fetching feeds from DB:", err);
     }
 
     // Filter hanya feed yang dipublikasikan, kecuali dipanggil oleh CMS (all=1).
@@ -142,7 +92,7 @@ export async function POST(request: Request) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)+/g, "");
 
-    const newFeed: FeedItem = {
+    let newFeed: FeedItem = {
       id: Date.now(),
       title,
       category,
@@ -172,12 +122,31 @@ export async function POST(request: Request) {
           isPublished: isPublished ?? true,
         })
         .returning();
+
       if (inserted && inserted.length > 0) {
-        newFeed.id = inserted[0].id;
+        const item = inserted[0];
+        newFeed = {
+          ...item,
+          imageUrl: item.imageUrl || "",
+          pdfAttachmentUrl: item.pdfAttachmentUrl || "-",
+          sections: Array.isArray(item.sections) ? item.sections : [],
+          publishedDate: item.publishedDate ? String(item.publishedDate) : "",
+          createdAt: item.createdAt ? item.createdAt.toISOString() : new Date().toISOString(),
+        };
       }
-    } catch {
-      fallbackFeeds.unshift(newFeed);
+    } catch (err) {
+      console.error("Error inserting feed into DB:", err);
     }
+
+    // Record audit log permanently in DB
+    await recordAuditLog({
+      adminId: 1,
+      action: "CREATE",
+      targetTable: "lpm_feeds",
+      targetId: newFeed.id,
+      details: `Mempublikasikan artikel feed '${title}' (Kategori: ${category})`,
+      ipAddress: "127.0.0.1",
+    });
 
     return NextResponse.json({ success: true, data: newFeed }, { status: 201 });
   } catch (error) {

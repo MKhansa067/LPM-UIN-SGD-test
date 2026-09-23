@@ -9,9 +9,66 @@ Dokumen ini berisi linimasa utama perubahan sistem per iterasi. Rincian setiap v
 - [`docs/log-5.md`](./log-5.md) — Iterasi 5 (v0.6.0)
 - [`docs/log-6.md`](./log-6.md) — Iterasi 6 (v0.7.0)
 - [`docs/log-7.md`](./log-7.md) — Iterasi 7 (v0.8.0)
+- [`docs/log-8.md`](./log-8.md) — Iterasi 8 (v0.8.5)
+- [`docs/log-9.md`](./log-9.md) — Iterasi 9 (v0.9.0)
+- [`docs/log-10.md`](./log-10.md) — Iterasi 10 (v0.9.5)
+- [`docs/log-11.md`](./log-11.md) — Iterasi 11 (v0.10.0)
 
 
 ---
+## [v0.10.0] — 2026-09-16 (Iterasi 11: Total Demo Data Removal — Portal Publik 100% Real Database & Opsi Upload PDF)
+**Tipe:** `feat` | `fix` | `db` | `public` | `admin` | `ui`
+**Developer:** AI Agent (Cline)
+*Lihat rincian lengkap di [`docs/log-11.md`](./log-11.md)*
+
+### ✅ Yang Diperbaiki & Ditambahkan
+- **Penghapusan Total Data Demo di Portal Publik**: Halaman `/dokumen`, `/feeds`, `/spmi`, `/akreditasi`, dan komponen `HomeFeeds.tsx` kini **100% membaca data riil dari PostgreSQL**. Seluruh array statis (`mockDocs`, `feedsData`, `fallbackDocs`, `mockAcc`, `fallbackFeeds`, `sampleFeeds`) dihapus.
+- **Sinkronisasi CRUD Admin → Portal**: Dokumen/feed yang dihapus di dashboard admin langsung hilang dari tampilan publik; data baru langsung muncul tanpa refresh manual.
+- **9 Sub-Kategori Dokumen Mutu Resmi**: AMI, AME, Renstra & RIP LPM, Sertifikasi ISO, Laporan Monev Pembelajaran, Laporan Survei Kepuasan, Uji Validitas Data SPMI, Kebijakan Mutu SPMI, dan Siklus PPEPP pada dashboard Dokumen Mutu.
+- **Dua Opsi File PDF**: Admin dapat **upload file PDF** (via `/api/uploads`) ATAU memasukkan **link PDF eksternal**.
+- **Empty State di Semua Halaman Publik**: Jika database kosong, halaman menampilkan pesan kosong yang bersih (bukan data demo), termasuk halaman **Event** (`/feeds?category=Event`).
+- **API Detail Feed Bersih**: `GET /api/feeds/[id]` kini mengembalikan 404 jika feed tidak ditemukan (fallback `sampleFeeds` dihapus).
+
+---
+
+## [v0.9.5] — 2026-09-16 (Iterasi 10: Fix State Persistence Bug — Multi-Create Form Reset Trial-and-Error)
+**Tipe:** `fix` | `admin` | `ui` | `refactor`
+**Developer:** AI Agent (Cline)
+*Lihat rincian lengkap di [`docs/log-10.md`](./log-10.md)*
+
+### ✅ Yang Diperbaiki
+- **Penanganan State Persistence / Stale Form Bug**: Mengatasi masalah di mana membuat item baru (Feed, Dokumen Mutu, SPMI, Akreditasi, Admin User) kedua kalinya dalam satu sesi justru mengedit item pertama karena `editId` / input state lama tidak dibersihkan.
+- **Helper `resetForm()` & `openCreateModal()`**: Menambahkan pembersihan state penuh pada event handler klik tombol "Tambah Baru" serta pada akhir penanganan submit berhasil di `CMS Feeds`, `Dokumen Mutu`, `SPMI`, `Akreditasi`, dan `Users`.
+- **Akreditasi Grid Multi-Edit Prevention**: `openNew()` mengeset `editingId = null` dan `openEdit()` mengeset `showNewRow = false` untuk mencegah konflik interaksi baris spreadsheet.
+
+---
+
+## [v0.9.0] — 2026-09-16 (Iterasi 9: Dynamic Audit Logging, Clean DB Single-Source-of-Truth, Dynamic Views & Stats)
+**Tipe:** `feat` | `fix` | `db` | `audit` | `api` | `admin`
+**Developer:** AI Agent (Cline)
+*Lihat rincian lengkap di [`docs/log-9.md`](./log-9.md)*
+
+### ✅ Yang Ditambahkan & Diperbaiki
+- **Dynamic Permanent Audit Logging (`lpm_audit_logs`)**: Helper `recordAuditLog()` (`lib/audit.ts`) menyisipkan setiap tindakan admin (Login, CRUD Feeds, Dokumen, SPMI, Akreditasi, Admin Users) secara permanen ke PostgreSQL.
+- **Join Admin Audit Log**: Endpoint `GET /api/audit-logs` melakukan `LEFT JOIN` ke `lpm_admins` untuk menampilkan nama admin pengelola asli.
+- **Pengosongan Array Sampel Statis**: Menghapus seluruh mock fallback array pada API (`/api/feeds`, `/api/dokumen`, `/api/spmi`, `/api/akreditasi`, `/api/admin/users`) agar tabel tidak memunculkan data hantu yang muncul-tenggelam.
+- **Real-Time Overview Stats (`/api/admin/stats`)**: Menampilkan total feed, total pembaca artikel (`SUM(view_count)`), total dokumen, dan persentase prodi Unggul secara dinamis dari database.
+- **Dynamic Relative Time Widget**: `AuditLog.tsx` pada overview dashboard diubah menjadi komponen dinamis dengan kalkulasi waktu relatif riil ("Baru saja", "X detik lalu", "X menit lalu").
+
+---
+
+## [v0.8.5] — 2026-09-14 (Iterasi 8: Rombak UI Beranda — Wide Header Logo, Hero Banner & Feeds Dokumentasi)
+**Tipe:** `feat` | `ui` | `public`
+**Developer:** AI Agent (Cline)
+*Lihat rincian lengkap di [`docs/log-8.md`](./log-8.md)*
+
+### ✅ Yang Ditambahkan
+- Header Logo `logo-uin-blu-akre.webp` di kiri atas dan Hero Banner `logo-lpm.webp` di bagian utama.
+- Rombak total `HomeFeeds.tsx` untuk mengambil foto dokumentasi real-time dari database PostgreSQL.
+- Komponen `SocialIcons.tsx` dengan SVG inline untuk brand sosial media (FB, IG, YT, X).
+
+---
+
 ## [v0.8.0] — 2026-09-11 (Iterasi 7: CMS Polish — Uploads, Draft/Publish, Drag-Drop Sections, Feed Preview)
 **Tipe:** `feat` | `ui` | `admin` | `editor` | `api` | `refactor`
 **Developer:** AI Agent (Cline)

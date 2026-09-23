@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Newspaper,
@@ -12,33 +14,60 @@ import {
 } from "lucide-react";
 import AuditLog from "@/components/admin/AuditLog";
 
+interface StatsData {
+  totalFeeds: number;
+  totalViews: string;
+  totalDocs: number;
+  unggulPercentage: string;
+}
+
 export default function AdminDashboardOverview() {
+  const [statsData, setStatsData] = useState<StatsData>({
+    totalFeeds: 0,
+    totalViews: "0",
+    totalDocs: 0,
+    unggulPercentage: "0%",
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/admin/stats")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setStatsData(json.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
   const stats = [
     {
       title: "Total Konten Feed",
-      value: "24",
+      value: loading ? "..." : String(statsData.totalFeeds),
       subtext: "Berita, Pengumuman, Event",
       icon: Newspaper,
       color: "bg-emerald-900 text-white",
     },
     {
       title: "Total Pembaca Artikel",
-      value: "14,820",
-      subtext: "Akumulasi view count",
+      value: loading ? "..." : statsData.totalViews,
+      subtext: "Akumulasi view count realtime",
       icon: Eye,
       color: "bg-slate-900 text-amber-400",
     },
     {
       title: "Dokumen Registrasi",
-      value: "86",
+      value: loading ? "..." : String(statsData.totalDocs),
       subtext: "Regulasi, Monev & SPMI",
       icon: FolderKanban,
       color: "bg-emerald-900 text-white",
     },
     {
       title: "Prodi Akreditasi Unggul",
-      value: "78%",
-      subtext: "Target 2026 Terlampaui",
+      value: loading ? "..." : statsData.unggulPercentage,
+      subtext: "Persentase Unggul & Internasional",
       icon: Award,
       color: "bg-amber-500 text-slate-900",
     },

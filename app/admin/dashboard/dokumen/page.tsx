@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Search, Trash2, Download, X } from "lucide-react";
+import { Plus, Search, Trash2, Download, X, Upload, FileText } from "lucide-react";
 
 interface DocItem {
   id: number;
@@ -20,18 +20,33 @@ export default function AdminDokumenPage() {
 
   const [title, setTitle] = useState("");
   const [mainCategory, setMainCategory] = useState("Dokumen Regulasi");
-  const [subCategory, setSubCategory] = useState("AMI");
+  const [subCategory, setSubCategory] = useState("Audit Mutu Internal (AMI)");
   const [year, setYear] = useState(new Date().getFullYear());
   const [targetUnit, setTargetUnit] = useState("Universitas");
   const [downloadUrl, setDownloadUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const subCategories: Record<string, string[]> = {
-    "Dokumen Regulasi": ["AMI", "AME", "Renstra & RIP", "HAKi", "Sertifikasi"],
-    "Monitoring & Evaluasi": ["Laporan Monev", "Uji Validitas", "Laporan Survei"],
-    "SPMI": ["Kebijakan", "PPEPP", "Standar Mutu", "Kebijakan Mutu"],
+    "Dokumen Regulasi": ["Audit Mutu Internal (AMI)", "Audit Mutu Eksternal (AME)", "Renstra & RIP LPM", "Sertifikasi ISO"],
+    "Monitoring & Evaluasi": ["Laporan Monev Pembelajaran", "Laporan Survei Kepuasan", "Uji Validitas Data SPMI"],
+    "SPMI": ["Kebijakan Mutu SPMI", "Siklus PPEPP"],
   };
 
   useEffect(() => { fetchDocs(); }, []);
+
+  function resetForm() {
+    setTitle("");
+    setMainCategory("Dokumen Regulasi");
+    setSubCategory("Audit Mutu Internal (AMI)");
+    setYear(new Date().getFullYear());
+    setTargetUnit("Universitas");
+    setDownloadUrl("");
+  }
+
+  function openCreateModal() {
+    resetForm();
+    setShowModal(true);
+  }
 
   async function fetchDocs() {
     try {
@@ -39,6 +54,28 @@ export default function AdminDokumenPage() {
       const json = await res.json();
       if (json.success && json.data) setDocs(json.data);
     } catch { /* fallback */ }
+  }
+
+  async function handleUploadPdf(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/uploads", { method: "POST", body: fd });
+      const json = await res.json();
+      if (json.success && json.url) {
+        setDownloadUrl(json.url);
+      } else {
+        alert(json.error || "Gagal mengunggah file PDF");
+      }
+    } catch {
+      alert("Gagal mengunggah file PDF");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -50,6 +87,7 @@ export default function AdminDokumenPage() {
         body: JSON.stringify({ title, mainCategory, subCategory, year, targetUnit, downloadUrl }),
       });
       setShowModal(false);
+      resetForm();
       fetchDocs();
     } catch { alert("Gagal menyimpan dokumen"); }
   }
@@ -70,7 +108,7 @@ return (
           <span className="text-xs uppercase font-bold text-amber-500 tracking-wider block">Repositori Dokumen</span>
           <h1 className="text-xl font-bold text-slate-900">Kelola Dokumen Mutu & Monev</h1>
         </div>
-        <button onClick={() => setShowModal(true)} className="inline-flex items-center space-x-2 bg-emerald-900 hover:bg-emerald-950 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors">
+        <button onClick={openCreateModal} className="inline-flex items-center space-x-2 bg-emerald-900 hover:bg-emerald-950 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors">
           <Plus className="w-4 h-4 text-amber-400" />
           <span>Tambah Dokumen</span>
         </button>
@@ -94,19 +132,31 @@ return (
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-            {filteredDocs.map((doc) => (
-              <tr key={doc.id} className="hover:bg-slate-50">
-                <td className="py-3 px-4 font-semibold text-slate-900 max-w-xs truncate">{doc.title}</td>
-                <td className="py-3 px-4"><span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">{doc.mainCategory}</span></td>
-                <td className="py-3 px-4 text-slate-500">{doc.subCategory}</td>
-                <td className="py-3 px-4 text-slate-500">{doc.year}</td>
-                <td className="py-3 px-4 text-slate-500">{doc.targetUnit}</td>
-                <td className="py-3 px-4 text-right space-x-2">
-                  <a href={doc.downloadUrl} target="_blank" rel="noreferrer" className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md inline-flex"><Download className="w-3.5 h-3.5" /></a>
-                  <button onClick={() => handleDelete(doc.id)} className="p-1.5 bg-red-50 text-red-700 hover:bg-red-100 rounded-md"><Trash2 className="w-3.5 h-3.5" /></button>
+            {filteredDocs.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-10 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <FileText className="w-10 h-10 text-slate-300" />
+                    <p className="text-sm font-semibold text-slate-500">Belum ada dokumen mutu.</p>
+                    <p className="text-xs text-slate-400">Klik tombol "Tambah Dokumen" untuk menambahkan dokumen AMI, Renstra, PPEPP, dan lainnya.</p>
+                  </div>
                 </td>
               </tr>
-            ))}
+            ) : (
+              filteredDocs.map((doc) => (
+                <tr key={doc.id} className="hover:bg-slate-50">
+                  <td className="py-3 px-4 font-semibold text-slate-900 max-w-xs truncate">{doc.title}</td>
+                  <td className="py-3 px-4"><span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">{doc.mainCategory}</span></td>
+                  <td className="py-3 px-4 text-slate-500">{doc.subCategory}</td>
+                  <td className="py-3 px-4 text-slate-500">{doc.year}</td>
+                  <td className="py-3 px-4 text-slate-500">{doc.targetUnit}</td>
+                  <td className="py-3 px-4 text-right space-x-2">
+                    <a href={doc.downloadUrl} target="_blank" rel="noreferrer" className="p-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md inline-flex"><Download className="w-3.5 h-3.5" /></a>
+                    <button onClick={() => handleDelete(doc.id)} className="p-1.5 bg-red-50 text-red-700 hover:bg-red-100 rounded-md"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -148,8 +198,32 @@ return (
                 </div>
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Download URL</label>
-                <input type="text" value={downloadUrl} onChange={(e) => setDownloadUrl(e.target.value)} required className="w-full p-2.5 border border-slate-200 rounded-lg" />
+                <label className="font-bold text-slate-700 block mb-1">File PDF / Download URL</label>
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <label className="inline-flex items-center space-x-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-semibold px-3 py-2 rounded-lg cursor-pointer transition-colors">
+                      {uploading ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                          <span>Mengunggah...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Upload File PDF</span>
+                        </>
+                      )}
+                      <input type="file" accept="application/pdf" onChange={handleUploadPdf} className="hidden" disabled={uploading} />
+                    </label>
+                    <span className="text-[11px] text-slate-400">atau gunakan link external di bawah</span>
+                  </div>
+                  <input type="text" value={downloadUrl} onChange={(e) => setDownloadUrl(e.target.value)} required placeholder="https://example.com/dokumen/AMI-2026.pdf" className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-900" />
+                  {downloadUrl && (
+                    <p className="text-[11px] text-emerald-700 break-all">
+                      ✔ URL aktif: <a href={downloadUrl} target="_blank" rel="noreferrer" className="underline">{downloadUrl}</a>
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex justify-end space-x-2 pt-4 border-t">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg">Batal</button>

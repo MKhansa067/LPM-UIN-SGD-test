@@ -2,89 +2,19 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lpmDocuments } from "@/lib/schema";
 import { desc, eq } from "drizzle-orm";
+import { recordAuditLog } from "@/lib/audit";
 
-const sampleDocuments = [
-  {
-    id: 1,
-    title: "Pedoman Operasional Baku Audit Mutu Internal (AMI) 2026",
-    mainCategory: "Dokumen Regulasi",
-    subCategory: "AMI",
-    year: 2026,
-    targetUnit: "Universitas",
-    downloadUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    title: "Laporan Evaluasi Diri (LED) & Audit Mutu Eksternal BAN-PT",
-    mainCategory: "Dokumen Regulasi",
-    subCategory: "AME",
-    year: 2025,
-    targetUnit: "Fakultas Sains dan Teknologi",
-    downloadUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    title: "Rencana Strategis (Renstra) Lembaga Penjaminan Mutu 2024-2029",
-    mainCategory: "Dokumen Regulasi",
-    subCategory: "Renstra & RIP",
-    year: 2024,
-    targetUnit: "Universitas",
-    downloadUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 4,
-    title: "Buku Kebijakan Sistem Penjaminan Mutu Internal (SPMI) UIN SGD",
-    mainCategory: "SPMI",
-    subCategory: "Kebijakan",
-    year: 2025,
-    targetUnit: "Universitas",
-    downloadUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 5,
-    title: "Manual Penetapan, Pelaksanaan, Evaluasi, Pengendalian, Peningkatan (PPEPP)",
-    mainCategory: "SPMI",
-    subCategory: "PPEPP",
-    year: 2025,
-    targetUnit: "Universitas",
-    downloadUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 6,
-    title: "Laporan Hasil Survei Kepuasan Mahasiswa Terhadap Layanan Akademik 2025",
-    mainCategory: "Monitoring & Evaluasi",
-    subCategory: "Laporan Survei",
-    year: 2025,
-    targetUnit: "Universitas",
-    downloadUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 7,
-    title: "Laporan Monev Pembelajaran Semester Ganjil 2025/2026",
-    mainCategory: "Monitoring & Evaluasi",
-    subCategory: "Laporan Monev",
-    year: 2025,
-    targetUnit: "Seluruh Program Studi",
-    downloadUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 8,
-    title: "Sertifikat ISO 9001:2015 Sistem Manajemen Mutu Perguruan Tinggi",
-    mainCategory: "Dokumen Regulasi",
-    subCategory: "Sertifikasi",
-    year: 2025,
-    targetUnit: "Universitas",
-    downloadUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    createdAt: new Date().toISOString(),
-  },
-];
+interface DocItem {
+  id: number;
+  title: string;
+  mainCategory: string;
+  subCategory: string;
+  year: number;
+  targetUnit: string;
+  downloadUrl: string;
+  fileSize?: string;
+  createdAt: string;
+}
 
 export async function GET(request: Request) {
   try {
@@ -94,18 +24,25 @@ export async function GET(request: Request) {
     const year = searchParams.get("year");
     const query = searchParams.get("q");
 
-    let docs = [...sampleDocuments];
+    let docs: DocItem[] = [];
 
     try {
       const dbDocs = await db.select().from(lpmDocuments).orderBy(desc(lpmDocuments.year));
       if (dbDocs && dbDocs.length > 0) {
-        docs = dbDocs.map(d => ({
-          ...d,
+        docs = dbDocs.map((d) => ({
+          id: d.id,
+          title: d.title,
+          mainCategory: d.mainCategory,
+          subCategory: d.subCategory,
+          year: d.year,
+          targetUnit: d.targetUnit || "Universitas",
+          downloadUrl: d.downloadUrl,
+          fileSize: d.fileSize || "1.2 MB",
           createdAt: d.createdAt ? d.createdAt.toISOString() : new Date().toISOString(),
         }));
       }
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.error("Error fetching documents from DB:", err);
     }
 
     if (mainCategory && mainCategory !== "Semua") {
@@ -147,7 +84,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const newDoc = {
+    let newDoc: DocItem = {
       id: Date.now(),
       title,
       mainCategory,
@@ -172,12 +109,23 @@ export async function POST(request: Request) {
           fileSize: fileSize || "1.2 MB",
         })
         .returning();
+
       if (inserted && inserted.length > 0) {
         newDoc.id = inserted[0].id;
       }
-    } catch {
-      sampleDocuments.unshift(newDoc);
+    } catch (err) {
+      console.error("Error inserting document into DB:", err);
     }
+
+    // Record audit log permanently in DB
+    await recordAuditLog({
+      adminId: 1,
+      action: "CREATE",
+      targetTable: "lpm_documents",
+      targetId: newDoc.id,
+      details: `Menambahkan dokumen mutu '${title}' (${mainCategory} - ${subCategory})`,
+      ipAddress: "127.0.0.1",
+    });
 
     return NextResponse.json({ success: true, data: newDoc }, { status: 201 });
   } catch (error) {
@@ -198,11 +146,17 @@ export async function DELETE(request: Request) {
     }
 
     const docId = parseInt(id, 10);
-    try {
-      await db.delete(lpmDocuments).where(eq(lpmDocuments.id, docId));
-    } catch {
-      // Offline fallback
-    }
+    await db.delete(lpmDocuments).where(eq(lpmDocuments.id, docId));
+
+    // Record audit log permanently in DB
+    await recordAuditLog({
+      adminId: 1,
+      action: "DELETE",
+      targetTable: "lpm_documents",
+      targetId: docId,
+      details: `Menghapus dokumen mutu ID ${docId}`,
+      ipAddress: "127.0.0.1",
+    });
 
     return NextResponse.json({ success: true, message: "Dokumen berhasil dihapus" });
   } catch (error) {

@@ -5,15 +5,9 @@ import TopHeader from "@/components/public/TopHeader";
 import Header from "@/components/public/Header";
 import Navbar from "@/components/public/Navbar";
 import Footer from "@/components/public/Footer";
-import { ShieldCheck, Search, Download } from "lucide-react";
+import { ShieldCheck, Search, Download, FileText } from "lucide-react";
 
 interface SpmiDoc { id: number; title: string; category: string; fileUrl: string; year: number; description: string; }
-
-const fallbackDocs: SpmiDoc[] = [
-  { id: 1, title: "Buku Kebijakan SPMI UIN Sunan Gunung Djati Bandung", category: "Kebijakan SPMI", fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf", year: 2025, description: "Landasan filosofis, asas, dan prinsip utama pelaksanaan SPMI di UIN SGD." },
-  { id: 2, title: "Manual Penetapan Standar Mutu Akademik UIN SGD (Manual P)", category: "PPEPP", fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf", year: 2025, description: "Prosedur penetapan Indikator Kinerja Utama (IKU) dan IKT." },
-  { id: 3, title: "Buku Standar Mutu Pendidikan, Penelitian, dan PKM (32 Standar)", category: "Standar Mutu", fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf", year: 2025, description: "Dokumen tolok ukur 32 Standar Mutu UIN SGD Bandung." },
-];
 
 const ppeppSteps = [
   { code: "P", name: "Penetapan", desc: "Penetapan 32 Standar SPMI & IKU." },
@@ -24,12 +18,17 @@ const ppeppSteps = [
 ];
 
 export default function SpmiPage() {
-  const [documents, setDocuments] = useState<SpmiDoc[]>(fallbackDocs);
+  const [documents, setDocuments] = useState<SpmiDoc[]>([]);
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/spmi").then(r => r.json()).then(json => { if (json.success && json.data) setDocuments(json.data); }).catch(() => {});
+    let cancelled = false;
+    fetch("/api/spmi").then(r => r.json()).then(json => {
+      if (!cancelled && json.success && Array.isArray(json.data)) setDocuments(json.data);
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const categories = ["Semua", "Kebijakan SPMI", "PPEPP", "Standar Mutu", "Kebijakan Mutu"];
@@ -87,7 +86,18 @@ export default function SpmiPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredDocs.map((doc) => (
+              {loading ? (
+                <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-10 text-center">
+                  <span className="text-xs text-slate-400">Memuat dokumen SPMI...</span>
+                </div>
+              ) : filteredDocs.length === 0 ? (
+                <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-10 text-center">
+                  <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm font-semibold text-slate-500">Belum ada dokumen SPMI pada kategori ini.</p>
+                  <p className="text-xs text-slate-400 mt-1">Dokumen Kebijakan Mutu SPMI, Siklus PPEPP, dan standar mutu akan tampil di sini setelah ditambahkan oleh admin.</p>
+                </div>
+              ) : (
+              filteredDocs.map((doc) => (
                 <div key={doc.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -104,7 +114,8 @@ export default function SpmiPage() {
                     </a>
                   </div>
                 </div>
-              ))}
+              ))
+              )}
             </div>
           </div>
         </section>

@@ -27,6 +27,19 @@ export default function AdminSpmiPage() {
 
   useEffect(() => { fetchDocs(); }, []);
 
+  function resetForm() {
+    setTitle("");
+    setCategory(categories[0]);
+    setFileUrl("");
+    setYear(new Date().getFullYear());
+    setDescription("");
+  }
+
+  function openCreateModal() {
+    resetForm();
+    setShowModal(true);
+  }
+
   async function fetchDocs() {
     try {
       const res = await fetch("/api/spmi");
@@ -44,6 +57,7 @@ export default function AdminSpmiPage() {
         body: JSON.stringify({ title, category, fileUrl, year, description }),
       });
       setShowModal(false);
+      resetForm();
       fetchDocs();
     } catch { alert("Gagal menyimpan dokumen SPMI"); }
   }
@@ -66,7 +80,7 @@ const filteredDocs = docs.filter(
           <span className="text-xs uppercase font-bold text-amber-500 tracking-wider block">Dokumen SPMI</span>
           <h1 className="text-xl font-bold text-slate-900">Kelola Dokumen SPMI</h1>
         </div>
-        <button onClick={() => setShowModal(true)} className="inline-flex items-center space-x-2 bg-emerald-900 hover:bg-emerald-950 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors">
+        <button onClick={openCreateModal} className="inline-flex items-center space-x-2 bg-emerald-900 hover:bg-emerald-950 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors">
           <Plus className="w-4 h-4 text-amber-400" />
           <span>Tambah Dokumen SPMI</span>
         </button>

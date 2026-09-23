@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { lpmAdmins } from "@/lib/schema";
 import { desc, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { recordAuditLog } from "@/lib/audit";
 
 interface AdminUser {
   id: number;
@@ -15,22 +16,9 @@ interface AdminUser {
   createdAt: string;
 }
 
-const sampleAdmins: AdminUser[] = [
-  {
-    id: 1,
-    name: "Super Admin LPM",
-    username: "admin_lpm",
-    email: "lpm@uinsgd.ac.id",
-    role: "superadmin",
-    isActive: true,
-    lastLogin: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export async function GET() {
   try {
-    let admins: AdminUser[] = [...sampleAdmins];
+    let admins: AdminUser[] = [];
 
     try {
       const dbAdmins = await db.select().from(lpmAdmins).orderBy(desc(lpmAdmins.createdAt));
@@ -46,8 +34,8 @@ export async function GET() {
           createdAt: a.createdAt ? a.createdAt.toISOString() : new Date().toISOString(),
         }));
       }
-    } catch {
-      // Offline fallback
+    } catch (err) {
+      console.error("Error fetching admin users from DB:", err);
     }
 
     return NextResponse.json({ success: true, data: admins, total: admins.length });
@@ -73,7 +61,7 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const newAdmin: AdminUser = {
+    let newAdmin: AdminUser = {
       id: Date.now(),
       name,
       username,
@@ -99,9 +87,19 @@ export async function POST(request: Request) {
       if (inserted && inserted.length > 0) {
         newAdmin.id = inserted[0].id;
       }
-    } catch {
-      sampleAdmins.unshift(newAdmin);
+    } catch (err) {
+      console.error("Error inserting admin user into DB:", err);
     }
+
+    // Record audit log permanently in DB
+    await recordAuditLog({
+      adminId: 1,
+      action: "CREATE",
+      targetTable: "lpm_admins",
+      targetId: newAdmin.id,
+      details: `Menambahkan akun admin pengelola '${username}' (${name})`,
+      ipAddress: "127.0.0.1",
+    });
 
     return NextResponse.json({ success: true, data: newAdmin }, { status: 201 });
   } catch (error) {
@@ -122,11 +120,17 @@ export async function DELETE(request: Request) {
     }
 
     const adminId = parseInt(id, 10);
-    try {
-      await db.delete(lpmAdmins).where(eq(lpmAdmins.id, adminId));
-    } catch {
-      // Offline fallback
-    }
+    await db.delete(lpmAdmins).where(eq(lpmAdmins.id, adminId));
+
+    // Record audit log permanently in DB
+    await recordAuditLog({
+      adminId: 1,
+      action: "DELETE",
+      targetTable: "lpm_admins",
+      targetId: adminId,
+      details: `Menghapus akun admin ID ${adminId}`,
+      ipAddress: "127.0.0.1",
+    });
 
     return NextResponse.json({ success: true, message: "Admin berhasil dihapus" });
   } catch (error) {

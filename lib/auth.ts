@@ -6,6 +6,7 @@ import { db } from "./db";
 import { lpmAdmins } from "./schema";
 import { eq } from "drizzle-orm";
 import { loginSchema } from "./validations";
+import { recordAuditLog } from "./audit";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -44,6 +45,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .set({ lastLogin: new Date() })
             .where(eq(lpmAdmins.id, admin.id));
 
+          // Record audit log permanently in DB
+          await recordAuditLog({
+            adminId: admin.id,
+            action: "LOGIN",
+            targetTable: "lpm_admins",
+            targetId: admin.id,
+            details: `Superadmin '${admin.username}' (${admin.name}) berhasil masuk ke Dashboard`,
+            ipAddress: "127.0.0.1",
+          });
+
           return {
             id: String(admin.id),
             name: admin.name,
@@ -58,3 +69,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
 });
+

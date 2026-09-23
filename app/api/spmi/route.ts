@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lpmSpmiDocs } from "@/lib/schema";
 import { desc, eq } from "drizzle-orm";
+import { recordAuditLog } from "@/lib/audit";
 
 interface SpmiItem {
   id: number;
@@ -13,79 +14,13 @@ interface SpmiItem {
   createdAt: string;
 }
 
-const sampleSpmiDocs: SpmiItem[] = [
-  {
-    id: 1,
-    title: "Buku Kebijakan Sistem Penjaminan Mutu Internal (SPMI) UIN Sunan Gunung Djati Bandung",
-    category: "Kebijakan SPMI",
-    fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    year: 2025,
-    description: "Landasan filosofis, asas, dan prinsip utama pelaksanaan SPMI di lingkungan UIN SGD Bandung.",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    title: "Manual Penetapan Standar Mutu Akademik UIN SGD (Manual P)",
-    category: "PPEPP",
-    fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    year: 2025,
-    description: "Prosedur baku penyusunan dan penetapan Indikator Kinerja Utama (IKU) dan Indikator Kinerja Tambahan (IKT).",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    title: "Manual Pelaksanaan Standar Pembelajaran dan Penelitian (Manual P)",
-    category: "PPEPP",
-    fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    year: 2025,
-    description: "Panduan operationalisasi pelaksanaan standar mutu tridharma perguruan tinggi.",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 4,
-    title: "Manual Evaluasi & Audit Mutu Internal (AMI) Akademik (Manual E)",
-    category: "PPEPP",
-    fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    year: 2026,
-    description: "Tata cara desk evaluation dan visitasi lapangan Audit Mutu Internal semesteran.",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 5,
-    title: "Manual Pengendalian Standar & Rapat Tinjauan Manajemen (Manual P)",
-    category: "PPEPP",
-    fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    year: 2025,
-    description: "Prosedur RTM untuk tindak lanjut temuan audit mutu internal dan penyusunan RTL.",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 6,
-    title: "Buku Standar Mutu Pendidikan, Penelitian, dan PKM (32 Standar Mutu)",
-    category: "Standar Mutu",
-    fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    year: 2025,
-    description: "Dokumen tolok ukur 32 Standar Mutu UIN SGD Bandung.",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 7,
-    title: "Kebijakan Mutu dan Maklumat Pelayanan Penjaminan Mutu Lembaga",
-    category: "Kebijakan Mutu",
-    fileUrl: "https://www.w3.org/WSI/pdf/n3-spec.pdf",
-    year: 2024,
-    description: "Komitmen kepemimpinan dalam mewujudkan budaya mutu terintegrasi.",
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category");
     const query = searchParams.get("q");
 
-    let docs: SpmiItem[] = [...sampleSpmiDocs];
+    let docs: SpmiItem[] = [];
 
     try {
       const dbDocs = await db.select().from(lpmSpmiDocs).orderBy(desc(lpmSpmiDocs.year));
@@ -100,8 +35,8 @@ export async function GET(request: Request) {
           createdAt: d.createdAt ? d.createdAt.toISOString() : new Date().toISOString(),
         }));
       }
-    } catch {
-      // Fallback to sample array
+    } catch (err) {
+      console.error("Error fetching SPMI docs from DB:", err);
     }
 
     if (category && category !== "Semua") {
@@ -138,7 +73,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const newItem: SpmiItem = {
+    let newItem: SpmiItem = {
       id: Date.now(),
       title,
       category,
@@ -159,12 +94,23 @@ export async function POST(request: Request) {
           description: description || "",
         })
         .returning();
+
       if (inserted && inserted.length > 0) {
         newItem.id = inserted[0].id;
       }
-    } catch {
-      sampleSpmiDocs.unshift(newItem);
+    } catch (err) {
+      console.error("Error inserting SPMI doc into DB:", err);
     }
+
+    // Record audit log permanently in DB
+    await recordAuditLog({
+      adminId: 1,
+      action: "CREATE",
+      targetTable: "lpm_spmi_docs",
+      targetId: newItem.id,
+      details: `Menambahkan dokumen SPMI '${title}' (Kategori: ${category})`,
+      ipAddress: "127.0.0.1",
+    });
 
     return NextResponse.json({ success: true, data: newItem }, { status: 201 });
   } catch (error) {
@@ -184,11 +130,18 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "ID wajib diisi" }, { status: 400 });
     }
 
-    try {
-      await db.delete(lpmSpmiDocs).where(eq(lpmSpmiDocs.id, parseInt(id, 10)));
-    } catch {
-      // Offline fallback
-    }
+    const docId = parseInt(id, 10);
+    await db.delete(lpmSpmiDocs).where(eq(lpmSpmiDocs.id, docId));
+
+    // Record audit log permanently in DB
+    await recordAuditLog({
+      adminId: 1,
+      action: "DELETE",
+      targetTable: "lpm_spmi_docs",
+      targetId: docId,
+      details: `Menghapus dokumen SPMI ID ${docId}`,
+      ipAddress: "127.0.0.1",
+    });
 
     return NextResponse.json({ success: true, message: "Dokumen SPMI dihapus" });
   } catch (error) {

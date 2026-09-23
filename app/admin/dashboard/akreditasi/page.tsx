@@ -61,6 +61,7 @@ export default function AdminAkreditasiPage() {
         body: JSON.stringify(draft),
       });
       setShowNewRow(false);
+      setEditingId(null);
       setDraft(null);
       fetchData();
     } catch { alert("Gagal menambah data akreditasi"); }
@@ -75,11 +76,13 @@ export default function AdminAkreditasiPage() {
   }
 
   function openEdit(item: AccItem) {
+    setShowNewRow(false);
     setEditingId(item.id);
     setDraft({ ...item });
   }
 
   function openNew() {
+    setEditingId(null);
     setShowNewRow(true);
     setDraft({
       id: 0,
