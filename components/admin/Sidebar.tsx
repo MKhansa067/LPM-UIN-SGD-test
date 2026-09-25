@@ -24,20 +24,26 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-const menuItems = [
-  { name: "Overview Analytics", href: "/admin/dashboard", icon: LayoutDashboard },
-  { name: "Kelola CMS Feed", href: "/admin/dashboard/cms", icon: Newspaper },
-  { name: "Kelola Dokumen Mutu", href: "/admin/dashboard/dokumen", icon: FolderKanban },
-  { name: "Kelola SPMI", href: "/admin/dashboard/spmi", icon: ShieldCheck },
-  { name: "Data Akreditasi", href: "/admin/dashboard/akreditasi", icon: Award },
-  { name: "Kelola Admin", href: "/admin/dashboard/users", icon: UserCircle2 },
-  { name: "Log Aktivitas", href: "/admin/dashboard/audit-log", icon: Activity },
-  { name: "Pengaturan Admin", href: "/admin/dashboard/pengaturan", icon: Settings },
-];
-
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
+  
+  // Ambil role pengguna dari sesi NextAuth
+  const userRole = (session?.user as { role?: string })?.role || "admin";
+
+  const menuItems = [
+    { name: "Overview Analytics", href: "/admin/dashboard", icon: LayoutDashboard, roles: ["superadmin", "admin", "editor"] },
+    { name: "Kelola CMS Feed", href: "/admin/dashboard/cms", icon: Newspaper, roles: ["superadmin", "admin", "editor"] },
+    { name: "Kelola Dokumen Mutu", href: "/admin/dashboard/dokumen", icon: FolderKanban, roles: ["superadmin", "admin", "editor"] },
+    { name: "Kelola SPMI", href: "/admin/dashboard/spmi", icon: ShieldCheck, roles: ["superadmin", "admin", "editor"] },
+    { name: "Data Akreditasi", href: "/admin/dashboard/akreditasi", icon: Award, roles: ["superadmin", "admin", "editor"] },
+    { name: "Kelola Admin", href: "/admin/dashboard/users", icon: UserCircle2, roles: ["superadmin"] }, // Hanya Superadmin
+    { name: "Log Aktivitas", href: "/admin/dashboard/audit-log", icon: Activity, roles: ["superadmin", "admin"] },
+    { name: "Pengaturan Profil", href: "/admin/dashboard/pengaturan", icon: Settings, roles: ["superadmin", "admin", "editor"] },
+  ];
+
+  // Filter menu berdasarkan role
+  const visibleMenuItems = menuItems.filter(item => item.roles.includes(userRole as string));
 
   return (
     <>
@@ -96,7 +102,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Navigation Items */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const Icon = item.icon;
             const isActive =
               item.href === "/admin/dashboard"

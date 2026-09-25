@@ -4,6 +4,7 @@ import { lpmAdmins } from "@/lib/schema";
 import { desc, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { recordAuditLog } from "@/lib/audit";
+import { auth } from "@/lib/auth";
 
 interface AdminUser {
   id: number;
@@ -18,6 +19,13 @@ interface AdminUser {
 
 export async function GET() {
   try {
+    const session = await auth();
+    const userRole = (session?.user as { role?: string })?.role;
+
+    if (userRole !== "superadmin") {
+      return NextResponse.json({ success: false, error: "Akses ditolak: Hanya Superadmin" }, { status: 403 });
+    }
+
     let admins: AdminUser[] = [];
 
     try {
@@ -49,6 +57,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    const userRole = (session?.user as { role?: string })?.role;
+    const currentAdminId = parseInt((session?.user as { id?: string })?.id || "1", 10);
+
+    if (userRole !== "superadmin") {
+      return NextResponse.json({ success: false, error: "Akses ditolak: Hanya Superadmin" }, { status: 403 });
+    }
+
     const body = await request.json();
     const { name, username, email, password, role } = body;
 
@@ -93,11 +109,11 @@ export async function POST(request: Request) {
 
     // Record audit log permanently in DB
     await recordAuditLog({
-      adminId: 1,
+      adminId: currentAdminId,
       action: "CREATE",
       targetTable: "lpm_admins",
       targetId: newAdmin.id,
-      details: `Menambahkan akun admin pengelola '${username}' (${name})`,
+      details: `Menambahkan akun admin pengelola '${username}' (${name}) dengan role '${role}'`,
       ipAddress: "127.0.0.1",
     });
 
@@ -112,6 +128,14 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const session = await auth();
+    const userRole = (session?.user as { role?: string })?.role;
+    const currentAdminId = parseInt((session?.user as { id?: string })?.id || "1", 10);
+
+    if (userRole !== "superadmin") {
+      return NextResponse.json({ success: false, error: "Akses ditolak: Hanya Superadmin" }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -120,11 +144,17 @@ export async function DELETE(request: Request) {
     }
 
     const adminId = parseInt(id, 10);
+
+    // Mencegah admin menghapus dirinya sendiri
+    if (adminId === currentAdminId) {
+      return NextResponse.json({ success: false, error: "Anda tidak dapat menghapus akun Anda sendiri" }, { status: 400 });
+    }
+
     await db.delete(lpmAdmins).where(eq(lpmAdmins.id, adminId));
 
     // Record audit log permanently in DB
     await recordAuditLog({
-      adminId: 1,
+      adminId: currentAdminId,
       action: "DELETE",
       targetTable: "lpm_admins",
       targetId: adminId,

@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, Shield, Trash2, Search, UserCircle2, X } from "lucide-react";
+import { Plus, Shield, Trash2, Search, UserCircle2, X, ShieldAlert } from "lucide-react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 interface AdminUser {
   id: number;
@@ -22,6 +24,7 @@ function formatDate(iso: string | null): string {
 }
 
 export default function AdminUsersPage() {
+  const { data: session, status } = useSession();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -29,6 +32,8 @@ export default function AdminUsersPage() {
   const [form, setForm] = useState({ name: "", username: "", email: "", password: "", role: "admin" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const userRole = (session?.user as { role?: string })?.role || "admin";
 
   const loadUsers = () => {
     setLoading(true);
@@ -42,8 +47,41 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    if (status === "authenticated" && userRole === "superadmin") {
+      loadUsers();
+    }
+  }, [status, userRole]);
+
+  if (status === "loading") {
+    return (
+      <div className="p-8 text-center text-xs text-slate-500">
+        Memverifikasi hak akses...
+      </div>
+    );
+  }
+
+  // Proteksi Akses Halaman: Hanya Superadmin
+  if (userRole !== "superadmin") {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg mx-auto my-12 text-center shadow-xs space-y-4">
+        <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-base font-bold text-slate-900">Akses Ditolak (Restricted Access)</h2>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Halaman <span className="font-semibold text-slate-800">Manajemen Admin</span> hanya dapat diakses oleh <span className="font-bold text-emerald-900">Superadmin</span>. Peran Anda saat ini adalah <span className="font-bold uppercase text-amber-700">{userRole}</span>.
+        </p>
+        <div className="pt-2">
+          <Link
+            href="/admin/dashboard"
+            className="inline-flex items-center px-4 py-2 bg-emerald-900 text-white font-bold text-xs rounded-lg hover:bg-emerald-800 transition-colors"
+          >
+            Kembali ke Overview Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const openCreateModal = () => {
     setError("");
