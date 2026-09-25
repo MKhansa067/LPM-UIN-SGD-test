@@ -33,7 +33,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null;
           }
 
-          const passwordsMatch = await bcrypt.compare(password, admin.passwordHash);
+          let passwordsMatch = false;
+          try {
+            passwordsMatch = await bcrypt.compare(password, admin.passwordHash);
+          } catch {
+            passwordsMatch = false;
+          }
+
+          // Fallback: Jika bukan hash bcrypt yang valid, periksa pencocokan teks polos (plain text)
+          if (!passwordsMatch && password === admin.passwordHash) {
+            passwordsMatch = true;
+
+            // 🌟 Otomatis upgrade password di DB dari Plain Text menjadi Bcrypt Hash demi keamanan
+            try {
+              const newHash = await bcrypt.hash(password, 12);
+              await db
+                .update(lpmAdmins)
+                .set({ passwordHash: newHash })
+                .where(eq(lpmAdmins.id, admin.id));
+            } catch (err) {
+              console.error("Gagal auto-upgrade password hash:", err);
+            }
+          }
 
           if (!passwordsMatch) {
             return null;
